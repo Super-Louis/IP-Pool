@@ -28,18 +28,18 @@ def get_ips(url):
 		protocol = tr_soup.find_all('td')[5].text
 		ip = tr_soup.find_all('td')[1].text
 		port = tr_soup.find_all('td')[2].text
-		ip_single = {protocol.lower(): ip + ":" + port} #是一个字典
+		ip_single = {protocol.lower(): ip + ":" + port} #字典形式
 		print(ip_single)
 		lock.acquire()
 		ip_list.append(ip_single)
 		lock.release()
-	# print('共有%d个ip' % len(ip_list))
 	
 
 if __name__ == '__main__':
 	lock = threading.Lock()
 	threads = []
 	ip_list = []
+	# 获取前十页的高匿IP，共1000个
 	for i in range(1, 11):
 		url = 'http://www.xicidaili.com/nn/' + str(i)
 		thread = threading.Thread(target=get_ips, args=(url, ))
