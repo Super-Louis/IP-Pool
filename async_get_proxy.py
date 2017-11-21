@@ -2,11 +2,39 @@ import json
 import aiohttp
 import asyncio
 import time
+import pika
+from pika import exceptions as pika_exception
+import logging
+
+class MqSession(object):
+    def __init__(self):
+        try:
+            self.credentials = pika.PlainCredentials(username='***', password='***')
+            self.connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host='***', credentials=self.credentials))
+            self.channel = self.connection.channel()
+            self.channel.basic_qos(prefetch_count=1)
+        except Exception as e:
+            logging.error('rabbit mq error : %s' % (str(e)))
+            raise
+
+    def put(self, queue, body):
+        while True:
+            try:
+                self.channel.basic_publish(exchange='***', routing_key=queue, body=body.encode('utf-8'))
+            except pika_exception.ConnectionClosed:
+                self.channel = self.connection.channel()
+            except Exception as e:
+                logging.error('rabbit mq error : %s' % (str(e)))
+                return -1
+            else:
+                return 0
+
+    def close(self):
+        self.connection.close()
 
 class Get_Proxy:
     def __init__(self):
-        self.ip_list_valid = list()
-        self.proxy_list = list()
         self._session = None
 
     @property
@@ -16,21 +44,19 @@ class Get_Proxy:
         return self._session
 
     async def get_proxy(self):
-        res = await self.session.get("http://80161325451205093.standard.hutoudaili.com/"
-                                   "?num=500&area_type=1&scheme=0&anonymity=0&order=1")
+        proxy_list = list()
+        res = await self.session.get("******")
         resp = await res.text()
         for p in resp.split("\n"):
             proxy_ip = "http://" + p.strip()
-            self.proxy_list.append(proxy_ip)
-            # print(proxy)
-        print(len(self.proxy_list))
+            proxy_list.append(proxy_ip)
+        print(len(proxy_list))
 
-        return self.proxy_list
+        return proxy_list
 
     async def check_proxy(self,ip):
         url = 'https://www.baidu.com/'
-        # 创建proxyhandler
-        # 添加user_agent
+
         headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -41,11 +67,10 @@ class Get_Proxy:
             'Upgrade-Insecure-Requests': '1',
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36'
         }
-        # 安装opener
         try:
             res = await self.session.get(url,headers=headers,proxy=ip,timeout=5)
             print(ip, 'is ok')
-            self.ip_list_valid.append(ip)
+            mq.put(queue='***', body=proxy)
         except Exception as e:
             print(ip, e)
 
@@ -57,9 +82,7 @@ class Get_Proxy:
         self.session.close()
         time2 = time.time()
         print(f"total time {time2-time1}s")
-        print(f"proxy valid:{len(self.ip_list_valid)}")
-        with open('proxy_pool.txt', 'w') as f:
-            json.dump(self.ip_list_valid, f)
+
 
     def run(self):
         # gp = Get_Proxy()
@@ -69,7 +92,9 @@ class Get_Proxy:
 
 
 if __name__=='__main__':
+    mq = MqSession()
     gp = Get_Proxy()
     gp.run()
+    mq.close()
 
 
